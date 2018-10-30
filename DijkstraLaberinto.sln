@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.28010.2041
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DijkstraLaberinto", "DijkstraLaberinto.vcxproj", "{972413CE-877A-4BFB-9BBE-668D106AE7C8}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{972413CE-877A-4BFB-9BBE-668D106AE7C8}.Debug|x64.ActiveCfg = Debug|x64
+		{972413CE-877A-4BFB-9BBE-668D106AE7C8}.Debug|x64.Build.0 = Debug|x64
+		{972413CE-877A-4BFB-9BBE-668D106AE7C8}.Debug|x86.ActiveCfg = Debug|Win32
+		{972413CE-877A-4BFB-9BBE-668D106AE7C8}.Debug|x86.Build.0 = Debug|Win32
+		{972413CE-877A-4BFB-9BBE-668D106AE7C8}.Release|x64.ActiveCfg = Release|x64
+		{972413CE-877A-4BFB-9BBE-668D106AE7C8}.Release|x64.Build.0 = Release|x64
+		{972413CE-877A-4BFB-9BBE-668D106AE7C8}.Release|x86.ActiveCfg = Release|Win32
+		{972413CE-877A-4BFB-9BBE-668D106AE7C8}.Release|x86.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {51E5D4B5-E051-4FCB-AF0C-87D4293F7B3B}
+	EndGlobalSection
+EndGlobal
