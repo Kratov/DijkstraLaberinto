@@ -404,11 +404,11 @@ struct Maze
 			Color color = { 100,0,0 };
 
 			if (a->pos.X == b->pos.X)
-				for (int j = min(a->pos.Y, b->pos.Y); j < max(a->pos.Y, b->pos.Y); j++)
-					bmpImage->SetPixel(j, a->pos.X, color);
+				for (int j = min(a->pos.Y, b->pos.Y); j < max(a->pos.Y, b->pos.Y) + 1; j++)
+					bmpImage->SetPixel(a->pos.X, j, color);
 			else if (a->pos.Y == b->pos.Y)
-				for (int j = min(a->pos.X, b->pos.X); j < max(a->pos.X, b->pos.X) + 1; j++)
-					bmpImage->SetPixel(a->pos.Y, j, color);
+				for (int j = min(a->pos.X, b->pos.X); j < max(a->pos.X, b->pos.X); j++)
+					bmpImage->SetPixel(j, a->pos.Y, color);
 		}
 
 		CLSID pngClsid;
