@@ -24,8 +24,9 @@ TipoPixel roadOrWall(const Color & color)
 struct Maze
 {
 	struct Node {
-		COORD pos;
+		COORD pos = {0};
 		Node * neighbor[4] = { 0 };
+		Node() {}
 		Node(COORD pos) 
 		{
 			this->pos = pos;
@@ -53,6 +54,10 @@ struct Maze
 		Color color;
 		TipoPixel tipoDePixel;
 
+		//Buffer nodos fila superior
+
+		Node ** topNodes = new Node*[image->GetWidth()];
+
 		//===== Define el nodo de inicio =====
 		for (size_t i = 0; i < image->GetWidth(); i++)
 		{
@@ -64,17 +69,119 @@ struct Maze
 				cord.X = i;
 				cord.Y = 0;
 				start = new Node(cord);
+				topNodes[i] = start;
 				break;
 			}
 		}
 
 
 		//===== Nodos entre laberinto =====
+		//Recorre filas pixeles
 		for (unsigned int i = 1; i < image->GetHeight(); i++)
 		{
+			bool next, curr, prev;
+			next = curr = prev = false;
+
+			//Recorre columnas pixeles
 			for (unsigned int j = 0; j < image->GetWidth(); j++)
 			{
-				
+				Node * leftNode = NULL;
+
+				//Verifica que el siguiente pixel sea camino
+				bmpImage->GetPixel(j + 1, i, &color);
+				next = roadOrWall(color) == Camino;
+				//Primer iteracion -- Anterior pared
+				prev = curr;
+
+				//El actual pasa a ser el siguiente
+				curr = next;
+
+				Node * n = NULL;
+
+				//Verifica que el actual no sea pared para no agregar nodo ahi
+				if (!curr)
+					continue;
+
+				if (prev)
+				{
+					if (next)
+					{
+						// CAMINO(PREV), CAMINO(CURR), CAMINO(NEXT) 
+						// Agrega Nodo si existe otro encima o abajo
+						bmpImage->GetPixel(j, i - 1, &color);
+						bool caminoArriba = roadOrWall(color) == Camino;
+						bmpImage->GetPixel(j, i + 1, &color);
+						bool caminoAbajo = roadOrWall(color) == Camino;
+						if (caminoArriba or caminoAbajo)
+						{
+							COORD pos;
+							pos.X = i;
+							pos.Y = j;
+							n = new Node(pos);
+							leftNode->neighbor[1] = n;
+							n->neighbor[3] = leftNode;
+							leftNode = n;
+						}
+					}
+					else 
+					{
+						//CAMINO, CAMINO, PARED
+						//Crea nodo al final del corredor.
+						COORD pos;
+						pos.X = i;
+						pos.Y = j;
+						n = new Node(pos);
+						//Une al Nodo de la izquierda
+						n->neighbor[3] = leftNode;
+						leftNode = NULL;
+					}
+				}
+				else
+				{
+					if (next)
+					{
+						//PADED, CAMINO, CAMINO
+						COORD pos;
+						pos.X = i;
+						pos.Y = j;
+						n = new Node(pos);
+						leftNode = n;
+					}
+					else
+					{
+						//PARED, CAMINO, PARED
+						//Se crea solo si esta en camino sin salida
+						bmpImage->GetPixel(j, i - 1, &color);
+						bool caminoArriba = roadOrWall(color) == Camino;
+						bmpImage->GetPixel(j, i + 1, &color);
+						bool caminoAbajo = roadOrWall(color) == Camino;
+						if (!caminoArriba or !caminoAbajo)
+						{
+							COORD pos;
+							pos.X = i;
+							pos.Y = j;
+							n = new Node(pos);
+						}
+					}
+				}
+
+				if (n)
+				{
+					if (true)
+					{
+						Node * t = topNodes[j];
+						t->neighbor[2] = n;
+						n->neighbor[0] = t;
+					}
+
+					bmpImage->GetPixel(j, i + 1, &color);
+					bool caminoAbajo = roadOrWall(color) == Camino;
+					if (caminoAbajo > 0) 
+						topNodes[j] = n;
+					else
+						topNodes[j] = NULL;
+
+				}
 			}
 		}
 
@@ -99,7 +206,7 @@ struct Maze
 
 		//====================================
 		//===== Imprimir laberinto		 =====
-		//====================================
+		//====================================;
 
 
 		//===== Imprimir fila start =====
@@ -164,7 +271,7 @@ struct Maze
 
 int main()
 {
-	Maze laberinto(L"C:\\ProyectoGrafos\\Laberinto.png");
+	Maze laberinto(L"C:\\ProgramacionEstructuras\\ImagenLaberintos\\tiny.png");
 	getchar();
 	return 0;
 }
