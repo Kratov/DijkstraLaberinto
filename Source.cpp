@@ -426,7 +426,7 @@ struct Maze
 
 int main()
 {
-	Maze laberinto(L"C:\\ProgramacionEstructuras\\ImagenLaberintos\\normal.png");
+	Maze laberinto(L"C:\\ProgramacionEstructuras\\ImagenLaberintos\\perfect15k.png");
 	cout << endl << endl << "\nNumero de nodos generados: " << laberinto.count;
 	laberinto.solve();
 	for (int i = 0; i < laberinto.resultPath.size(); i++)
@@ -434,7 +434,7 @@ int main()
 		cout << "\nResultado path: ("<< laberinto.resultPath[i]->pos.X<<","<< laberinto.resultPath[i]->pos.Y<<")";
 	}
 
-	laberinto.solveImage(L"C:\\ProgramacionEstructuras\\ImagenLaberintos\\normal.png");
+	laberinto.solveImage(L"C:\\ProgramacionEstructuras\\ImagenLaberintos\\perfect15k.png");
 	getchar();
 	return 0;
 }
