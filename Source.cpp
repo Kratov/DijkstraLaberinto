@@ -205,8 +205,8 @@ struct Maze
 						if (!caminoArriba or !caminoAbajo)
 						{
 							COORD pos;
-							pos.X = i;
-							pos.Y = j;
+							pos.X = j;
+							pos.Y = i;
 							n = new Node(pos);
 						}
 					}
@@ -425,7 +425,7 @@ struct Maze
 
 int main()
 {
-	Maze laberinto(L"C:\\ProgramacionEstructuras\\ImagenLaberintos\\tiny.png");
+	Maze laberinto(L"C:\\ProgramacionEstructuras\\ImagenLaberintos\\small.png");
 	cout << endl << endl << "\nNumero de nodos generados: " << laberinto.count;
 	laberinto.solve();
 	for (int i = 0; i < laberinto.resultPath.size(); i++)
@@ -433,7 +433,7 @@ int main()
 		cout << "\nResultado path: ("<< laberinto.resultPath[i]->pos.X<<","<< laberinto.resultPath[i]->pos.Y<<")";
 	}
 
-	laberinto.solveImage(L"C:\\ProgramacionEstructuras\\ImagenLaberintos\\tiny.png");
+	laberinto.solveImage(L"C:\\ProgramacionEstructuras\\ImagenLaberintos\\small.png");
 	getchar();
 	return 0;
 }

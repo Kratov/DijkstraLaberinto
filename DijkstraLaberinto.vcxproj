@@ -119,6 +119,19 @@
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Default</CompileAs>
     </ClCompile>
   </ItemGroup>
+  <ItemGroup>
+    <Image Include="..\..\..\..\..\..\ProgramacionEstructuras\ImagenLaberintos\braid200.png" />
+    <Image Include="..\..\..\..\..\..\ProgramacionEstructuras\ImagenLaberintos\braid2k.png" />
+    <Image Include="..\..\..\..\..\..\ProgramacionEstructuras\ImagenLaberintos\combo400.png" />
+    <Image Include="..\..\..\..\..\..\ProgramacionEstructuras\ImagenLaberintos\combo6k.png" />
+    <Image Include="..\..\..\..\..\..\ProgramacionEstructuras\ImagenLaberintos\normal.png" />
+    <Image Include="..\..\..\..\..\..\ProgramacionEstructuras\ImagenLaberintos\perfect10k.png" />
+    <Image Include="..\..\..\..\..\..\ProgramacionEstructuras\ImagenLaberintos\perfect15k.png" />
+    <Image Include="..\..\..\..\..\..\ProgramacionEstructuras\ImagenLaberintos\perfect2k.png" />
+    <Image Include="..\..\..\..\..\..\ProgramacionEstructuras\ImagenLaberintos\perfect4k.png" />
+    <Image Include="..\..\..\..\..\..\ProgramacionEstructuras\ImagenLaberintos\small.png" />
+    <Image Include="..\..\..\..\..\..\ProgramacionEstructuras\ImagenLaberintos\tiny.png" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
