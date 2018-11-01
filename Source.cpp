@@ -179,6 +179,7 @@ struct Maze
 						pos.Y = i;
 						n = new Node(pos);
 						//Une al Nodo de la izquierda
+						leftNode->neighbor[1] = n;
 						n->neighbor[3] = leftNode;
 						leftNode = NULL;
 					}
@@ -425,7 +426,7 @@ struct Maze
 
 int main()
 {
-	Maze laberinto(L"C:\\ProgramacionEstructuras\\ImagenLaberintos\\small.png");
+	Maze laberinto(L"C:\\ProgramacionEstructuras\\ImagenLaberintos\\normal.png");
 	cout << endl << endl << "\nNumero de nodos generados: " << laberinto.count;
 	laberinto.solve();
 	for (int i = 0; i < laberinto.resultPath.size(); i++)
@@ -433,7 +434,7 @@ int main()
 		cout << "\nResultado path: ("<< laberinto.resultPath[i]->pos.X<<","<< laberinto.resultPath[i]->pos.Y<<")";
 	}
 
-	laberinto.solveImage(L"C:\\ProgramacionEstructuras\\ImagenLaberintos\\small.png");
+	laberinto.solveImage(L"C:\\ProgramacionEstructuras\\ImagenLaberintos\\normal.png");
 	getchar();
 	return 0;
 }
