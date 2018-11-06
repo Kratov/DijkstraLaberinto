@@ -12,21 +12,51 @@
 using namespace Gdiplus;
 using namespace std;
 
-char constexpr NODE = 64;
+char constexpr NODE = 79;
 char constexpr WALL = 219;
+BYTE constexpr R = 0;
+BYTE constexpr G = 0;
+BYTE constexpr B = 100;
 
-enum TipoPixel
-{
-	Camino,
-	Pared
+struct Pos {
+	int x;
+	int y;
 };
 
-TipoPixel roadOrWall(const Color & color)
+struct Node {
+	Pos pos;
+	Node * neighbor[4] = { 0 };  //A = 0, D = 1, AB= 2, I = 3
+};
+
+typedef pair<int, Node*> TDistanceNodePair;
+
+//====================================
+//===== Datos del laberinto =====
+//====================================
+vector<Node*> resultPath;
+const wchar_t * filename;
+Node * mazeStart = NULL;
+Node * mazeEnd = NULL;
+int mazeWidth = 0;
+int mazeHeight = 0;
+int nNodesInMaze = 0;
+
+//====================================
+//===== FIN nodos en laberinto =====
+//====================================
+
+enum TPixel
+{
+	Road,
+	Wall
+};
+
+TPixel roadOrWall(const Color & color)
 {
 	if ((color.GetRed() + color.GetGreen() + color.GetBlue()) > 0)
-		return TipoPixel::Camino;
+		return TPixel::Road;
 	else
-		return TipoPixel::Pared;
+		return TPixel::Wall;
 }
 
 void gotoxy(int column, int line)
@@ -40,401 +70,367 @@ void gotoxy(int column, int line)
 	);
 }
 
-struct Maze
-{
+void createGraph() {
+	//===== Inicializar GDI+ ===== 
+	GdiplusStartupInput gdiplusStartupInput;
+	ULONG_PTR gdiplusToken;
+	GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
 
-	struct Node {
-		COORD pos = {0};
-		Node * neighbor[4] = { 0 };
-		Node() {}
-		Node(COORD pos) 
-		{
-			this->pos = pos;
-		}
-	};
+	//===== Cargar imagen del laberinto =====
+	Image* image = Image::FromFile(filename);
+	Bitmap * bmpImage = (Bitmap*)image;
 
-	typedef pair<int, Node*> tPair;
+	//====================================
+	//===== Crear nodos en laberinto =====
+	//====================================
 
-	vector<Node*> resultPath;
-	Node * start = NULL;
-	Node * end = NULL;
-	int width = 0;
-	int height = 0;
-	int count = 0;
+	Color color;
+	TPixel pixelType;
+	mazeHeight = image->GetHeight();
+	mazeWidth = image->GetWidth();
 
-	Maze(const wchar_t * filename)
+	//Buffer nodos fila superior
+
+	Node ** aboveNodes = new Node*[mazeWidth];
+
+	//===== Define el nodo de inicio =====
+	for (int i = 0; i < mazeWidth; i++)
 	{
-		//===== Inicializar GDI+ ===== 
-		GdiplusStartupInput gdiplusStartupInput;
-		ULONG_PTR gdiplusToken;
-		GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
-
-		//===== Cargar imagen del laberinto =====
-		Image* image = Image::FromFile(filename);
-		Bitmap * bmpImage = (Bitmap*)image;
-
-		//====================================
-		//===== Crear nodos en laberinto =====
-		//====================================
-
-		Color color;
-		TipoPixel tipoDePixel;
-
-		//Buffer nodos fila superior
-
-		Node ** topNodes = new Node*[image->GetWidth()];
-		
-
-		int count = 0;
-
-		//===== Define el nodo de inicio =====
-		for (size_t i = 0; i < image->GetWidth(); i++)
+		bmpImage->GetPixel(i, 0, &color);
+		pixelType = roadOrWall(color);
+		if (pixelType == Road)
 		{
-			bmpImage->GetPixel(i, 0, &color);
-			tipoDePixel = roadOrWall(color);
-			if (tipoDePixel == Camino)
-			{
-				COORD cord;
-				cord.X = (short)i;
-				cord.Y = (short)0;
-				start = new Node(cord);
-				topNodes[i] = start;
-				count += 1;
-				#ifdef _DEBUG
-				cout << char(NODE);
-				#endif // _DEBUG
-				#ifndef _DEBUG
-				break;
-				#endif // _DEBUG
-			}
-			#ifdef _DEBUG
-			else	
-				cout << char(WALL);
-			#endif // DEBUG
-
+			mazeStart = new Node();
+			mazeStart->pos.x = i;
+			mazeStart->pos.y = 0;
+			aboveNodes[i] = mazeStart;
+			nNodesInMaze += 1;
+#ifdef _DEBUG
+			cout << char(NODE);
+#endif // _DEBUG
+#ifndef _DEBUG
+			break;
+#endif // _DEBUG
 		}
+#ifdef _DEBUG
+		else
+			cout << char(WALL);
+#endif // DEBUG
 
-		#ifdef _DEBUG
-		cout << endl;
-		#endif // _DEBUG
+	}
 
-		//===== Nodos entre laberinto =====
-		//Recorre filas pixeles
-		for (unsigned int i = 1; i < image->GetHeight() - 1; i++)
+#ifdef _DEBUG
+	cout << endl;
+#endif // _DEBUG
+
+	//===== Nodos entre laberinto =====
+	//Recorre filas pixeles
+	for (int i = 1; i < mazeHeight - 1; i++)
+	{
+		bool next, currentNode, terminatedStack;
+		next = currentNode = terminatedStack = false;
+		Node * leftNode = NULL;
+		//Recorre columnas pixeles
+		for (int j = 0; j < mazeWidth; j++)
 		{
-			bool next, curr, prev;
-			next = curr = prev = false;
-			Node * leftNode = NULL;
-			//Recorre columnas pixeles
-			for (unsigned int j = 0; j < image->GetWidth(); j++)
+
+			//Primer iteracion -- Anterior Wall
+			terminatedStack = currentNode;
+			//El actual pasa a ser el siguiente
+			currentNode = next;
+			//Verifica que el siguiente pixel sea Road
+			bmpImage->GetPixel(j + 1, i, &color);
+			next = roadOrWall(color) == Road;
+
+			Node * newNode = NULL;
+
+			//Verifica que el actual no sea Wall para no agregar nodo ahi
+			if (!currentNode)
 			{
+#ifdef _DEBUG
+				gotoxy(j, i); cout << char(WALL);
+#endif // _DEBUG
+				continue;
+			}
 
-				//Primer iteracion -- Anterior pared
-				prev = curr;
-				//El actual pasa a ser el siguiente
-				curr = next;
-				//Verifica que el siguiente pixel sea camino
-				bmpImage->GetPixel(j + 1, i, &color);
-				next = roadOrWall(color) == Camino;
 
-				Node * n = NULL;
-
-				//Verifica que el actual no sea pared para no agregar nodo ahi
-				if (!curr)
+			if (terminatedStack)
+			{
+				if (next)
 				{
-					#ifdef _DEBUG
-					gotoxy(j, i); cout << char(WALL); 
-					#endif // _DEBUG
-					continue;
-				}
-					
-
-				if (prev)
-				{
-					if (next)
+					// Camino(terminatedStack), Camino(currentNode), Camino(NEXT) 
+					// Agrega Nodo si existe otro encima o abajo
+					bmpImage->GetPixel(j, i - 1, &color);
+					bool RoadAbove = roadOrWall(color) == Road;
+					bmpImage->GetPixel(j, i + 1, &color);
+					bool RoadBelow = roadOrWall(color) == Road;
+					if (RoadAbove or RoadBelow)
 					{
-						// CAMINO(PREV), CAMINO(CURR), CAMINO(NEXT) 
-						// Agrega Nodo si existe otro encima o abajo
-						bmpImage->GetPixel(j, i - 1, &color);
-						bool caminoArriba = roadOrWall(color) == Camino;
-						bmpImage->GetPixel(j, i + 1, &color);
-						bool caminoAbajo = roadOrWall(color) == Camino;
-						if (caminoArriba or caminoAbajo)
-						{
-							COORD pos;
-							pos.X = j;
-							pos.Y = i;
-							n = new Node(pos);
-							leftNode->neighbor[1] = n;
-							n->neighbor[3] = leftNode;
-							leftNode = n;
-						}
-					}
-					else 
-					{
-						//CAMINO, CAMINO, PARED
-						//Crea nodo al final del corredor.
-						COORD pos;
-						pos.X = j;
-						pos.Y = i;
-						n = new Node(pos);
-						//Une al Nodo de la izquierda
-						leftNode->neighbor[1] = n;
-						n->neighbor[3] = leftNode;
-						leftNode = NULL;
+						newNode = new Node();
+						newNode->pos.x = j;
+						newNode->pos.y = i;
+						leftNode->neighbor[1] = newNode;
+						newNode->neighbor[3] = leftNode;
+						leftNode = newNode;
 					}
 				}
 				else
 				{
-					if (next)
-					{
-						//PADED, CAMINO, CAMINO
-						COORD pos;
-						pos.X = j;
-						pos.Y = i;
-						n = new Node(pos);
-						leftNode = n;
-					}
-					else
-					{
-						//PARED, CAMINO, PARED
-						//Se crea solo si esta en camino sin salida
-						bmpImage->GetPixel(j, i - 1, &color);
-						bool caminoArriba = roadOrWall(color) == Camino;
-						bmpImage->GetPixel(j, i + 1, &color);
-						bool caminoAbajo = roadOrWall(color) == Camino;
-						if (!caminoArriba or !caminoAbajo)
-						{
-							COORD pos;
-							pos.X = j;
-							pos.Y = i;
-							n = new Node(pos);
-						}
-					}
-				}
-
-				if (n)
-				{
-					#ifdef _DEBUG
-					gotoxy(j, i); cout << char(NODE);
-					#endif // _DEBUG
-					bmpImage->GetPixel(j, i - 1, &color);
-					bool caminoArriba = roadOrWall(color) == Camino;
-					if (caminoArriba)
-					{
-						Node * t = topNodes[j];
-						t->neighbor[2] = n;
-						n->neighbor[0] = t;
-					}
-
-					bmpImage->GetPixel(j, i + 1, &color);
-					bool caminoAbajo = roadOrWall(color) == Camino;
-					if (caminoAbajo) 
-						topNodes[j] = n;
-					else
-						topNodes[j] = NULL;
-
-					count += 1;
-
+					//Camino, Camino, Pared
+					//Crea nodo al final del corredor.
+					newNode = new Node();
+					newNode->pos.x = j;
+					newNode->pos.y = i;
+					//Une al Nodo de la izquierda
+					leftNode->neighbor[1] = newNode;
+					newNode->neighbor[3] = leftNode;
+					leftNode = NULL;
 				}
 			}
-		}
-
-		#ifdef _DEBUG
-		cout << endl;
-		#endif // _DEBUG
-
-		//===== Define el nodo de fin =====
-		for (size_t i = 0; i < image->GetWidth(); i++)
-		{
-			bmpImage->GetPixel(i, image->GetHeight() - 1, &color);
-			tipoDePixel = roadOrWall(color);
-			if (tipoDePixel == Camino)
-			{
-				COORD cord;
-				cord.X = (SHORT)i;
-				cord.Y = (SHORT)image->GetHeight() - 1;
-				end = new Node(cord);
-				Node * t = topNodes[i];
-				t->neighbor[2] = end;
-				end->neighbor[0] = t;
-				count += 1;
-				#ifdef _DEBUG
-				cout << char(NODE);
-				#endif // _DEBUG
-				#ifndef _DEBUG
-				break;
-				#endif // _DEBUG
-			}
-			#ifdef _DEBUG
 			else
-				cout << char(WALL);
-			#endif // _DEBUG
-		}
-
-		this->count = count;
-		this->width = image->GetWidth();
-		this->height = image->GetHeight();
-
-		//====================================
-		//===== FIN crear nodos en laberinto =====
-		//====================================
-
-		//===== Liberar memoria de imagen =====
-		delete image; image = 0;
-
-		//===== Terminar GDI+ =====
-		GdiplusShutdown(gdiplusToken);
-	}
-
-	void solve()
-	{
-		int width = this->width;
-		int total = this->width * this->height;
-
-		Node * start = this->start;
-		COORD startPos = start->pos;
-		Node * end = this->end;
-		COORD endPos = end->pos;
-
-		bool * visited = new bool[total];
-		for (int i = 0; i < total; i++)
-			visited[i] = false;
-
-		Node ** prev = new Node *[total];
-		for (int i = 0; i < total; i++)
-			prev[i] = NULL;
-
-		int infinity = INT_MAX;
-
-		int * distances = new int[total];
-		for (int i = 0; i < total; i++)
-			distances[i] = infinity;
-
-		priority_queue<tPair, vector<tPair>, greater<tPair>> unvisited;
-		
-		tPair * nodeIndex = new tPair[total];
-
-		distances[start->pos.X * width + start->pos.Y] = 0;
-		unvisited.push(make_pair(0, start));
-
-		int count = 0;
-		int completed = 0;
-
-		while (unvisited.size() > 0)
-		{
-			count += 1;
-
-			tPair n = unvisited.top();
-			unvisited.pop();
-
-			Node * u = n.second;
-
-			COORD uPos = u->pos;
-			int uPosIndex = uPos.X * width + uPos.Y;
-			
-			if (distances[uPosIndex] == infinity)			
-				break;
-
-			if ((uPos.X == endPos.X) && (uPos.Y == endPos.Y))
 			{
-				completed = true;
-				break;
+				if (next)
+				{
+					//Pared, Camino, Camino
+					newNode = new Node();
+					newNode->pos.x = j;
+					newNode->pos.y = i;
+					leftNode = newNode;
+				}
+				else
+				{
+					//Pared, Camino, Pared
+					//Se crea solo si esta en Road sin salida
+					bmpImage->GetPixel(j, i - 1, &color);
+					bool RoadAbove = roadOrWall(color) == Road;
+					bmpImage->GetPixel(j, i + 1, &color);
+					bool RoadBelow = roadOrWall(color) == Road;
+					if (!RoadAbove or !RoadBelow)
+					{
+						newNode = new Node();
+						newNode->pos.x = j;
+						newNode->pos.y = i;
+					}
+				}
 			}
 
-			for (int i = 0; i < 4; i++)
+			if (newNode)
 			{
-				Node * v = u->neighbor[i];
-				if (v)
+#ifdef _DEBUG
+				gotoxy(j, i); cout << char(NODE);
+#endif // _DEBUG
+				bmpImage->GetPixel(j, i - 1, &color);
+				bool RoadAbove = roadOrWall(color) == Road;
+				if (RoadAbove)
 				{
-					COORD vPos = v->pos;
-					int vPosIndex = vPos.X * width + vPos.Y;
-					if (!visited[vPosIndex])
-					{
-						int d = abs(vPos.X - uPos.X) + abs(vPos.Y - uPos.Y);
-						int newDistance = distances[uPosIndex] + d;
+					Node * topNode = aboveNodes[j];
+					topNode->neighbor[2] = newNode;
+					newNode->neighbor[0] = topNode;
+				}
 
-						if (newDistance	< distances[vPosIndex])
+				bmpImage->GetPixel(j, i + 1, &color);
+				bool RoadBelow = roadOrWall(color) == Road;
+				if (RoadBelow)
+					aboveNodes[j] = newNode;
+				else
+					aboveNodes[j] = NULL;
+
+				nNodesInMaze += 1;
+
+			}
+		}
+	}
+
+#ifdef _DEBUG
+	cout << endl;
+#endif // _DEBUG
+
+	//===== Define el nodo de fin =====
+	for (int i = 0; i < mazeWidth; i++)
+	{
+		bmpImage->GetPixel(i, mazeHeight - 1, &color);
+		pixelType = roadOrWall(color);
+		if (pixelType == Road)
+		{
+			mazeEnd = new Node();
+			mazeEnd->pos.x = i;
+			mazeEnd->pos.y = mazeHeight - 1;
+			Node * topNode = aboveNodes[i];
+			topNode->neighbor[2] = mazeEnd;
+			mazeEnd->neighbor[0] = topNode;
+			nNodesInMaze += 1;
+#ifdef _DEBUG
+			cout << char(NODE);
+#endif // _DEBUG
+#ifndef _DEBUG
+			break;
+#endif // _DEBUG
+		}
+#ifdef _DEBUG
+		else
+			cout << char(WALL);
+#endif // _DEBUG
+	}
+
+	//====================================
+	//===== FIN crear nodos en laberinto =====
+	//====================================
+
+	//Liberar memoria
+	delete[] aboveNodes;
+
+	//===== Liberar memoria de imagen =====
+	delete image; image = 0;
+	
+
+	//===== Terminar GDI+ =====
+	GdiplusShutdown(gdiplusToken);
+}
+
+void solveByDijkstra()
+{
+	int total = mazeWidth * mazeHeight;
+
+	Pos startPos = mazeStart->pos;
+	Pos endPos = mazeEnd->pos;
+
+	bool * visitedStack = new bool[total];
+	for (int i = 0; i < total; i++)
+		visitedStack[i] = false;
+
+	Node ** terminatedStack = new Node *[total];
+	for (int i = 0; i < total; i++)
+		terminatedStack[i] = NULL;
+
+	int infinity = INT_MAX;
+
+	int * distancesStack = new int[total];
+	for (int i = 0; i < total; i++)
+		distancesStack[i] = infinity;
+
+	priority_queue<TDistanceNodePair, vector<TDistanceNodePair>, greater<TDistanceNodePair>> unvisitedStack;
+
+	TDistanceNodePair * nodeIndex = new TDistanceNodePair[total];
+
+	distancesStack[mazeStart->pos.x * mazeWidth + mazeStart->pos.y] = 0;
+	unvisitedStack.push(make_pair(0, mazeStart));
+
+	int completed = 0;
+
+	while (unvisitedStack.size() > 0)
+	{
+
+		TDistanceNodePair newNode = unvisitedStack.top();
+		unvisitedStack.pop();
+
+		Node * currentAnalizeNode = newNode.second;
+		Pos uPos = currentAnalizeNode->pos;
+		int uPosIndex = uPos.x * mazeWidth + uPos.y;
+
+		if (distancesStack[uPosIndex] == infinity)
+			break;
+
+		if ((uPos.x == endPos.x) && (uPos.y == endPos.y))
+		{
+			completed = true;
+			break;
+		}
+
+		for (int i = 0; i < 4; i++)
+		{
+			Node * v = currentAnalizeNode->neighbor[i];
+			if (v)
+			{
+				Pos vPos = v->pos;
+				int vPosIndex = vPos.x * mazeWidth + vPos.y;
+				if (!visitedStack[vPosIndex])
+				{
+					int d = abs(vPos.x - uPos.x) + abs(vPos.y - uPos.y);
+					int newDistance = distancesStack[uPosIndex] + d;
+
+					if (newDistance < distancesStack[vPosIndex])
+					{
+						TDistanceNodePair vNode = nodeIndex[vPosIndex];
+						if (!vNode.second)
 						{
-							tPair vNode = nodeIndex[vPosIndex];
-							if (!vNode.second)
-							{
-								tPair vNode = make_pair(newDistance, v);
-								unvisited.push(vNode);
-								nodeIndex[vPosIndex] = vNode;
-								distances[vPosIndex] = newDistance;
-								prev[vPosIndex] = u;
-							}
-							else
-							{
-								unvisited.push(make_pair(newDistance, vNode.second));
-								distances[vPosIndex] = newDistance;
-								prev[vPosIndex] = u;
-							}
+							TDistanceNodePair vNode = make_pair(newDistance, v);
+							unvisitedStack.push(vNode);
+							nodeIndex[vPosIndex] = vNode;
+							distancesStack[vPosIndex] = newDistance;
+							terminatedStack[vPosIndex] = currentAnalizeNode;
+						}
+						else
+						{
+							unvisitedStack.push(make_pair(newDistance, vNode.second));
+							distancesStack[vPosIndex] = newDistance;
+							terminatedStack[vPosIndex] = currentAnalizeNode;
 						}
 					}
 				}
-				visited[uPosIndex] = true;
 			}
+			visitedStack[uPosIndex] = true;
 		}
-
-		Node * curr = end;
-		while (curr)
-		{
-			resultPath.push_back(curr);
-			curr = prev[curr->pos.X * width + curr->pos.Y];
-		}
-		reverse(resultPath.begin(), resultPath.end());
 	}
 
-	void solveImage(const wchar_t * filename) {
-
-		//===== Inicializar GDI+ ===== 
-		GdiplusStartupInput gdiplusStartupInput;
-		ULONG_PTR gdiplusToken;
-		GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
-
-		//===== Cargar imagen del laberinto =====
-		Image* image = Image::FromFile(filename);
-		Bitmap * bmpImage = (Bitmap*)image;
-		for (int i = 0; i < resultPath.size() - 1; i++)
-		{
-			Node * a = resultPath[i];
-			Node * b = resultPath[i + 1];
-
-			Color color = { 100,0,0 };
-
-			if (a->pos.X == b->pos.X)
-				for (int j = min(a->pos.Y, b->pos.Y); j < max(a->pos.Y, b->pos.Y) + 1; j++)
-					bmpImage->SetPixel(a->pos.X, j, color);
-			else if (a->pos.Y == b->pos.Y)
-				for (int j = min(a->pos.X, b->pos.X); j < max(a->pos.X, b->pos.X); j++)
-					bmpImage->SetPixel(j, a->pos.Y, color);
-		}
-
-		CLSID pngClsid;
-		CLSIDFromString(L"{557CF406-1A04-11D3-9A73-0000F81EF32E}", &pngClsid);
-		image->Save(L"Teminado.png", &pngClsid, NULL);
-
-		//===== Liberar memoria de imagen =====
-		delete image; image = 0;
-
-		//===== Terminar GDI+ =====
-		GdiplusShutdown(gdiplusToken);
+	Node * currentNode = mazeEnd;
+	while (currentNode)
+	{
+		resultPath.push_back(currentNode);
+		currentNode = terminatedStack[currentNode->pos.x * mazeWidth + currentNode->pos.y];
 	}
-};
+	reverse(resultPath.begin(), resultPath.end());
+
+	//Liberar memoria
+	delete[] visitedStack;
+	delete[] distancesStack;
+	delete[] terminatedStack;
+}
+
+void saveSolveInImage() {
+
+	//===== Inicializar GDI+ ===== 
+	GdiplusStartupInput gdiplusStartupInput;
+	ULONG_PTR gdiplusToken;
+	GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
+
+	//===== Cargar imagen del laberinto =====
+	Image* image = Image::FromFile(filename);
+	Bitmap * bmpImage = (Bitmap*)image;
+	for (int i = 0; i < resultPath.size() - 1; i++)
+	{
+		Node * a = resultPath[i];
+		Node * b = resultPath[i + 1];
+
+		Color color = { R,G,B };
+
+		if (a->pos.x == b->pos.x)
+			for (int j = min(a->pos.y, b->pos.y); j < max(a->pos.y, b->pos.y) + 1; j++)
+				bmpImage->SetPixel(a->pos.x, j, color);
+		else if (a->pos.y == b->pos.y)
+			for (int j = min(a->pos.x, b->pos.x); j < max(a->pos.x, b->pos.x); j++)
+				bmpImage->SetPixel(j, a->pos.y, color);
+	}
+
+	CLSID pngClsid;
+	CLSIDFromString(L"{557CF406-1A04-11D3-9A73-0000F81EF32E}", &pngClsid);
+	image->Save(L"Teminado.png", &pngClsid, NULL);
+
+	//===== Liberar memoria de imagen =====
+	delete image; image = 0;
+
+	//===== Terminar GDI+ =====
+	GdiplusShutdown(gdiplusToken);
+}
 
 int main()
 {
-	Maze laberinto(L"C:\\ProgramacionEstructuras\\ImagenLaberintos\\perfect15k.png");
-	cout << endl << endl << "\nNumero de nodos generados: " << laberinto.count;
-	laberinto.solve();
-	for (int i = 0; i < laberinto.resultPath.size(); i++)
-	{
-		cout << "\nResultado path: ("<< laberinto.resultPath[i]->pos.X<<","<< laberinto.resultPath[i]->pos.Y<<")";
-	}
-
-	laberinto.solveImage(L"C:\\ProgramacionEstructuras\\ImagenLaberintos\\perfect15k.png");
+	filename = L"C:\\ProgramacionEstructuras\\ImagenLaberintos\\6.png";
+	createGraph();
+	solveByDijkstra();
+	for (int i = 0; i < resultPath.size(); i++)
+		cout << "\nResultado path: ("<< resultPath[i]->pos.x<<","<< resultPath[i]->pos.y<<")";
+	cout << endl << endl << "\nNumero de nodos generados: " << nNodesInMaze;
+	saveSolveInImage();
 	getchar();
 	return 0;
 }
