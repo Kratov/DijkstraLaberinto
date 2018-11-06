@@ -18,6 +18,13 @@ BYTE constexpr R = 0;
 BYTE constexpr G = 0;
 BYTE constexpr B = 100;
 
+BYTE constexpr TOP = 0;
+BYTE constexpr RIGHT = 1;
+BYTE constexpr LEFT = 3;
+BYTE constexpr BOTTOM = 2;
+
+BYTE constexpr N_CARDINALS = 4;
+
 struct Pos {
 	int x;
 	int y;
@@ -25,7 +32,7 @@ struct Pos {
 
 struct Node {
 	Pos pos;
-	Node * neighbor[4] = { 0 };  //A = 0, D = 1, AB= 2, I = 3
+	Node * neighbor[N_CARDINALS] = { 0 };
 };
 
 typedef pair<int, Node*> TDistanceNodePair;
@@ -169,8 +176,8 @@ void createGraph() {
 						newNode = new Node();
 						newNode->pos.x = j;
 						newNode->pos.y = i;
-						leftNode->neighbor[1] = newNode;
-						newNode->neighbor[3] = leftNode;
+						leftNode->neighbor[RIGHT] = newNode;
+						newNode->neighbor[LEFT] = leftNode;
 						leftNode = newNode;
 					}
 				}
@@ -182,8 +189,8 @@ void createGraph() {
 					newNode->pos.x = j;
 					newNode->pos.y = i;
 					//Une al Nodo de la izquierda
-					leftNode->neighbor[1] = newNode;
-					newNode->neighbor[3] = leftNode;
+					leftNode->neighbor[RIGHT] = newNode;
+					newNode->neighbor[LEFT] = leftNode;
 					leftNode = NULL;
 				}
 			}
@@ -224,8 +231,8 @@ void createGraph() {
 				if (RoadAbove)
 				{
 					Node * topNode = aboveNodes[j];
-					topNode->neighbor[2] = newNode;
-					newNode->neighbor[0] = topNode;
+					topNode->neighbor[BOTTOM] = newNode;
+					newNode->neighbor[TOP] = topNode;
 				}
 
 				bmpImage->GetPixel(j, i + 1, &color);
@@ -256,8 +263,8 @@ void createGraph() {
 			mazeEnd->pos.x = i;
 			mazeEnd->pos.y = mazeHeight - 1;
 			Node * topNode = aboveNodes[i];
-			topNode->neighbor[2] = mazeEnd;
-			mazeEnd->neighbor[0] = topNode;
+			topNode->neighbor[BOTTOM] = mazeEnd;
+			mazeEnd->neighbor[TOP] = topNode;
 			nNodesInMaze += 1;
 #ifdef _DEBUG
 			cout << char(NODE);
@@ -324,51 +331,51 @@ void solveByDijkstra()
 		unvisitedStack.pop();
 
 		Node * currentAnalizeNode = newNode.second;
-		Pos uPos = currentAnalizeNode->pos;
-		int uPosIndex = uPos.x * mazeWidth + uPos.y;
+		Pos currentAnalizeNodePos = currentAnalizeNode->pos;
+		int currentAnalizeNodePosIndex = currentAnalizeNodePos.x * mazeWidth + currentAnalizeNodePos.y;
 
-		if (distancesStack[uPosIndex] == infinity)
+		if (distancesStack[currentAnalizeNodePosIndex] == infinity)
 			break;
 
-		if ((uPos.x == endPos.x) && (uPos.y == endPos.y))
+		if ((currentAnalizeNodePos.x == endPos.x) && (currentAnalizeNodePos.y == endPos.y))
 		{
 			completed = true;
 			break;
 		}
 
-		for (int i = 0; i < 4; i++)
+		for (int i = 0; i < N_CARDINALS; i++)
 		{
-			Node * v = currentAnalizeNode->neighbor[i];
-			if (v)
+			Node * neighborNode = currentAnalizeNode->neighbor[i];
+			if (neighborNode)
 			{
-				Pos vPos = v->pos;
-				int vPosIndex = vPos.x * mazeWidth + vPos.y;
-				if (!visitedStack[vPosIndex])
+				Pos neighborNodePos = neighborNode->pos;
+				int neighborNodePosIndex = neighborNodePos.x * mazeWidth + neighborNodePos.y;
+				if (!visitedStack[neighborNodePosIndex])
 				{
-					int d = abs(vPos.x - uPos.x) + abs(vPos.y - uPos.y);
-					int newDistance = distancesStack[uPosIndex] + d;
+					int d = abs(neighborNodePos.x - currentAnalizeNodePos.x) + abs(neighborNodePos.y - currentAnalizeNodePos.y);
+					int newDistance = distancesStack[currentAnalizeNodePosIndex] + d;
 
-					if (newDistance < distancesStack[vPosIndex])
+					if (newDistance < distancesStack[neighborNodePosIndex])
 					{
-						TDistanceNodePair vNode = nodeIndex[vPosIndex];
+						TDistanceNodePair vNode = nodeIndex[neighborNodePosIndex];
 						if (!vNode.second)
 						{
-							TDistanceNodePair vNode = make_pair(newDistance, v);
+							TDistanceNodePair vNode = make_pair(newDistance, neighborNode);
 							unvisitedStack.push(vNode);
-							nodeIndex[vPosIndex] = vNode;
-							distancesStack[vPosIndex] = newDistance;
-							terminatedStack[vPosIndex] = currentAnalizeNode;
+							nodeIndex[neighborNodePosIndex] = vNode;
+							distancesStack[neighborNodePosIndex] = newDistance;
+							terminatedStack[neighborNodePosIndex] = currentAnalizeNode;
 						}
 						else
 						{
 							unvisitedStack.push(make_pair(newDistance, vNode.second));
-							distancesStack[vPosIndex] = newDistance;
-							terminatedStack[vPosIndex] = currentAnalizeNode;
+							distancesStack[neighborNodePosIndex] = newDistance;
+							terminatedStack[neighborNodePosIndex] = currentAnalizeNode;
 						}
 					}
 				}
 			}
-			visitedStack[uPosIndex] = true;
+			visitedStack[currentAnalizeNodePosIndex] = true;
 		}
 	}
 
