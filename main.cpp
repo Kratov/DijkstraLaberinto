@@ -35,6 +35,7 @@ struct Node {
 	Node * neighbor[N_CARDINALS] = { 0 };
 };
 
+//Relaciona una distancia con un nodo. (Usado en cola de prioridad)
 typedef pair<int, Node*> TDistanceNodePair;
 
 //====================================
@@ -52,12 +53,15 @@ int nNodesInMaze = 0;
 //===== FIN nodos en laberinto =====
 //====================================
 
+
+//Road -> Camino, Wall -> Pared
 enum TPixel
 {
 	Road,
 	Wall
 };
 
+//Road(Pixel blanco), Wall(Pixel negro)
 TPixel roadOrWall(const Color & color)
 {
 	if ((color.GetRed() + color.GetGreen() + color.GetBlue()) > 0)
@@ -66,6 +70,7 @@ TPixel roadOrWall(const Color & color)
 		return TPixel::Wall;
 }
 
+//Funcion para posicion de cursor en consola.
 void gotoxy(int column, int line)
 {
 	COORD coord;
@@ -97,19 +102,22 @@ void createGraph() {
 	mazeWidth = image->GetWidth();
 
 	//Buffer nodos fila superior
-
 	Node ** aboveNodes = new Node*[mazeWidth];
 
 	//===== Define el nodo de inicio =====
 	for (int i = 0; i < mazeWidth; i++)
 	{
+		//Obtiene pixel (X,Y)
 		bmpImage->GetPixel(i, 0, &color);
 		pixelType = roadOrWall(color);
+
 		if (pixelType == Road)
 		{
+			//Define Nodo inicio (SOLO UNO)
 			mazeStart = new Node();
 			mazeStart->pos.x = i;
 			mazeStart->pos.y = 0;
+			//Guarda el nodo el Buffer de nodos superiores
 			aboveNodes[i] = mazeStart;
 			nNodesInMaze += 1;
 #ifdef _DEBUG
@@ -134,38 +142,40 @@ void createGraph() {
 	//Recorre filas pixeles
 	for (int i = 1; i < mazeHeight - 1; i++)
 	{
-		bool next, currentNode, terminatedStack;
-		next = currentNode = terminatedStack = false;
+		bool next, currentNode, previus;
+		next = currentNode = previus = false;
+		//Guarda el nodo a la izquierda del currentNode para luego ligarlo
 		Node * leftNode = NULL;
 		//Recorre columnas pixeles
 		for (int j = 0; j < mazeWidth; j++)
 		{
-
 			//Primer iteracion -- Anterior Wall
-			terminatedStack = currentNode;
+			previus = currentNode;
 			//El actual pasa a ser el siguiente
 			currentNode = next;
 			//Verifica que el siguiente pixel sea Road
 			bmpImage->GetPixel(j + 1, i, &color);
 			next = roadOrWall(color) == Road;
 
+			//Guarda el nodo si cumple con los criterios
 			Node * newNode = NULL;
 
 			//Verifica que el actual no sea Wall para no agregar nodo ahi
 			if (!currentNode)
 			{
 #ifdef _DEBUG
+				//Inprimimos si estamos en DEBUG una pared del laberinto
 				gotoxy(j, i); cout << char(WALL);
 #endif // _DEBUG
 				continue;
 			}
 
 
-			if (terminatedStack)
+			if (previus)
 			{
 				if (next)
 				{
-					// Camino(terminatedStack), Camino(currentNode), Camino(NEXT) 
+					// Camino(previus), Camino(currentNode), Camino(NEXT) 
 					// Agrega Nodo si existe otro encima o abajo
 					bmpImage->GetPixel(j, i - 1, &color);
 					bool RoadAbove = roadOrWall(color) == Road;
@@ -221,6 +231,7 @@ void createGraph() {
 				}
 			}
 
+			//Si existe un nuevo nodo (AQUI UNIMOS LOS NODOS SUPERIORES)
 			if (newNode)
 			{
 #ifdef _DEBUG
@@ -228,18 +239,24 @@ void createGraph() {
 #endif // _DEBUG
 				bmpImage->GetPixel(j, i - 1, &color);
 				bool RoadAbove = roadOrWall(color) == Road;
+				// Si existe un camino arriba
 				if (RoadAbove)
 				{
+					//Extrae nodo superior en el mismo X.
 					Node * topNode = aboveNodes[j];
+					//Los unimos
 					topNode->neighbor[BOTTOM] = newNode;
 					newNode->neighbor[TOP] = topNode;
 				}
 
 				bmpImage->GetPixel(j, i + 1, &color);
 				bool RoadBelow = roadOrWall(color) == Road;
+				//Si existe un camino inferior
 				if (RoadBelow)
+					//El nodo nuevo entra a ser el superior
 					aboveNodes[j] = newNode;
 				else
+					//No existen nodos ineriores al que unir se limpia.
 					aboveNodes[j] = NULL;
 
 				nNodesInMaze += 1;
@@ -296,85 +313,122 @@ void createGraph() {
 
 void solveByDijkstra()
 {
+	//Total de pixeles que existen en el laberinto
 	int total = mazeWidth * mazeHeight;
 
+	//Posicion de inicio del laberinto y final
 	Pos startPos = mazeStart->pos;
 	Pos endPos = mazeEnd->pos;
 
+	//Crea un stack de Nodos ya visitados en su INDEX. Inicializa a FALSE
 	bool * visitedStack = new bool[total];
 	for (int i = 0; i < total; i++)
 		visitedStack[i] = false;
 
+	//Stack de nodos ya evaluados
 	Node ** terminatedStack = new Node *[total];
 	for (int i = 0; i < total; i++)
 		terminatedStack[i] = NULL;
 
+	//Determina la distancia INFINITA. Para el stack de distancias.
 	int infinity = INT_MAX;
 
+	//Stack de distancias guarda distancia segun INDEX del NODO.
 	int * distancesStack = new int[total];
 	for (int i = 0; i < total; i++)
 		distancesStack[i] = infinity;
 
+	//Crea cola de prioridad - Menor a mayor
 	priority_queue<TDistanceNodePair, vector<TDistanceNodePair>, greater<TDistanceNodePair>> unvisitedStack;
 
+	//Crea un stack de INDEX para los nodos
 	TDistanceNodePair * nodeIndex = new TDistanceNodePair[total];
 
+	//Asigna la distancia 0 al nodo de inicio 
 	distancesStack[mazeStart->pos.x * mazeWidth + mazeStart->pos.y] = 0;
+
+	//Ingresa Nodo inicio a cola de prioridad
 	unvisitedStack.push(make_pair(0, mazeStart));
 
 	int completed = 0;
 
+	//Mientras existan Nodos por explorar en la Cola
 	while (unvisitedStack.size() > 0)
 	{
 
+		//Extrae el nodo de la Cola
 		TDistanceNodePair newNode = unvisitedStack.top();
+		//Lo elimina de la cola
 		unvisitedStack.pop();
 
+		//Toma el nodo de la pareja TDistanceNodePair
 		Node * currentAnalizeNode = newNode.second;
+
+		//Extrae la posicion del NODO analizado
 		Pos currentAnalizeNodePos = currentAnalizeNode->pos;
+
+		//Determina el INDEX del nodo analizado
 		int currentAnalizeNodePosIndex = currentAnalizeNodePos.x * mazeWidth + currentAnalizeNodePos.y;
 
+		//Si la distancia del nodo analizado es INFINITO
 		if (distancesStack[currentAnalizeNodePosIndex] == infinity)
 			break;
 
+		//Si las posiciones del nodo actual es igual a la del final entonces llegamos al nodo META
 		if ((currentAnalizeNodePos.x == endPos.x) && (currentAnalizeNodePos.y == endPos.y))
 		{
 			completed = true;
 			break;
 		}
 
+		//For cara cada uno de los nodos adyacentes
 		for (int i = 0; i < N_CARDINALS; i++)
 		{
+			//Extrae el nodo adyacente
 			Node * neighborNode = currentAnalizeNode->neighbor[i];
+
+			//Si existe un vecino
 			if (neighborNode)
 			{
+				//Extraemos la posicion del NODO vecino.
 				Pos neighborNodePos = neighborNode->pos;
+
+				//Extraemos el INDEX
 				int neighborNodePosIndex = neighborNodePos.x * mazeWidth + neighborNodePos.y;
+
+				//Si no fue visitado
 				if (!visitedStack[neighborNodePosIndex])
 				{
+					//Sacamos la distancia del NODO actual al NODO vecino
 					int d = abs(neighborNodePos.x - currentAnalizeNodePos.x) + abs(neighborNodePos.y - currentAnalizeNodePos.y);
+
+					//Suma la distancia del nodo actual 
 					int newDistance = distancesStack[currentAnalizeNodePosIndex] + d;
 
+					//Si la nueva distancia es menor al nodo vecino
 					if (newDistance < distancesStack[neighborNodePosIndex])
 					{
+						//Obtiene el NODO con mayor distancia (VECINO) y se la remplaza con la menor
 						TDistanceNodePair vNode = nodeIndex[neighborNodePosIndex];
+
+						//Si no existe el nodo en la cola de prioridad
 						if (!vNode.second)
 						{
 							TDistanceNodePair vNode = make_pair(newDistance, neighborNode);
 							unvisitedStack.push(vNode);
+							//Remplaza el nodo con la nueva distancia.
 							nodeIndex[neighborNodePosIndex] = vNode;
-							distancesStack[neighborNodePosIndex] = newDistance;
-							terminatedStack[neighborNodePosIndex] = currentAnalizeNode;
 						}
 						else
-						{
+							//Agrega el nodo si no existia en la cola
 							unvisitedStack.push(make_pair(newDistance, vNode.second));
-							distancesStack[neighborNodePosIndex] = newDistance;
-							terminatedStack[neighborNodePosIndex] = currentAnalizeNode;
-						}
+						
+						distancesStack[neighborNodePosIndex] = newDistance;
+						terminatedStack[neighborNodePosIndex] = currentAnalizeNode;
 					}
 				}
 			}
+			//Nodo queda analizado
 			visitedStack[currentAnalizeNodePosIndex] = true;
 		}
 	}
@@ -431,7 +485,7 @@ void saveSolveInImage() {
 
 int main()
 {
-	filename = L"C:\\ProgramacionEstructuras\\ImagenLaberintos\\6.png";
+	filename = L"C:\\ProgramacionEstructuras\\ImagenLaberintos\\8.png";
 	createGraph();
 	solveByDijkstra();
 	for (int i = 0; i < resultPath.size(); i++)
